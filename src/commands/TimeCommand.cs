@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
 using DSharpPlus;
@@ -20,34 +21,41 @@ public enum NixTimestampFormat
   LongDateTime,
   ShortTime,
   LongTime,
-  RelativeTime
+  RelativeTime,
+  UnixTimestamp
 }
 
-[InteractionAllowedContexts(new DiscordInteractionContextType[] {
+[InteractionAllowedContexts(
   DiscordInteractionContextType.Guild,
   DiscordInteractionContextType.BotDM,
   DiscordInteractionContextType.PrivateChannel
-})]
-[InteractionInstallType(new DiscordApplicationIntegrationType[] {
-  // DiscordApplicationIntegrationType.GuildInstall,
+)]
+[InteractionInstallType(
   DiscordApplicationIntegrationType.UserInstall
-})]
+)]
 [Command("time")]
 [TopLevelCommand]
 public static class TimeCommand
 {
-  static Regex TimeRegex = new(@"^(\d?\d):(\d\d)(?::(\d\d))?(?: ?([ap])\.?m?\.?)?$");
-  static Regex DateRegex = new(@"^(?:(\d{4})[-/\.])?(\d?\d)[-/\.](\d\d)$");
+  static readonly Regex TimeRegex = new(@"^(\d?\d):(\d\d)(?::(\d\d))?(?: ?([ap])\.?m?\.?)?$");
+  static readonly Regex DateRegex = new(@"^(?:(\d{4})[-/\.])?(\d?\d)[-/\.](\d\d)$");
+  static readonly Regex DayOffsetRegex = new(@"^([-+]\d+|0)$");
 
-  [InteractionInstallType(new DiscordApplicationIntegrationType[] {
-    // DiscordApplicationIntegrationType.GuildInstall,
-    DiscordApplicationIntegrationType.UserInstall
-  })]
-  [InteractionAllowedContexts(new DiscordInteractionContextType[] {
-    DiscordInteractionContextType.Guild,
-    DiscordInteractionContextType.BotDM,
-    DiscordInteractionContextType.PrivateChannel
-  })]
+  static readonly ReadOnlyDictionary<string, string> DaysOfWeek = new Dictionary<string, string>()
+  {
+    ["su"] = "sunday",
+    ["mo"] = "monday",
+    ["tu"] = "tuesday",
+    ["we"] = "wednesday",
+    ["th"] = "thursday",
+    ["fr"] = "friday",
+    ["sa"] = "saturday",
+    ["to"] = "today",
+    ["ye"] = "yesterday",
+    ["ub"] = "ubermorgen",
+    ["üb"] = "übermorgen"
+  }.AsReadOnly();
+
   [Command("code")]
   [Description("Get the <t:...> code for a given time of day")]
   public static async Task TimeCodeCommand(SlashCommandContext ctx,
@@ -55,7 +63,8 @@ public static class TimeCommand
     [Description("The date to get")] string date = null,
     [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
     [Description("What format to use")] NixTimestampFormat? format = null,
-    [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null
+    [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
+    [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true
   )
   {
     DateTimeZone zone = Settings.TimeZone;
@@ -66,7 +75,7 @@ public static class TimeCommand
       if (zoneForId != null) zone = zoneForId;
       else
       {
-        await ctx.RespondAsync($"`{timezone}` is not a valid time zone.");
+        await ctx.RespondAsync($"`{timezone}` is not a valid time zone.", true);
         return;
       }
     }
@@ -96,36 +105,69 @@ public static class TimeCommand
       }
       else
       {
-        await ctx.RespondAsync($"`{time}` isn't a valid time!");
+        await ctx.RespondAsync($"`{time}` isn't a valid time!", true);
         return;
       }
     }
 
     LocalDate lDate;
 
+    date = date.ToLower();
+
     var now = SystemClock.Instance.GetCurrentInstant();
     var zonedNow = now.InZone(zone);
-    var localNow = zonedNow.LocalDateTime;
+    var localNow = zonedNow.LocalDateTime - Period.FromHours(1);
 
     if (date != null)
     {
       if (DateRegex.TryMatch(date, out Match mtc))
       {
-        int year = 0;
+        int year = zonedNow.Year;
         int month = int.Parse(mtc.Groups[2].Value);
         int day = int.Parse(mtc.Groups[3].Value);
 
         if (mtc.Groups[1].Success) year = int.Parse(mtc.Groups[1].Value);
-        else
-        {
-          year = localNow.Year;
-        }
 
         lDate = new(year, month, day);
       }
+      else if (date.Length >= 3
+        && date.Length <= 8
+        && ("tomorrow")[0..date.Length] == date)
+      {
+        lDate = zonedNow.Date + Period.FromDays(1);
+      }
+      else if (date.Length >= 2
+        && DaysOfWeek.TryGetValue(date[0..2], out string pickedDay)
+        && date.Length <= pickedDay.Length
+        && pickedDay[0..date.Length] == date)
+      {
+        lDate = pickedDay switch
+        {
+          "today" or "yesterday" or "ubermorgen" or "übermorgen" => zonedNow.Date + Period.FromDays(pickedDay switch
+          {
+            "today" => 0,
+            "yesterday" => -1,
+            _ => 2
+          }),
+          _ => zonedNow.Date + Period.FromDays((pickedDay switch
+          {
+            "monday" => 1,
+            "tuesday" => 2,
+            "wednesday" => 3,
+            "thursday" => 4,
+            "friday" => 5,
+            "saturday" => 6,
+            _ => 7
+          } - (int)zonedNow.DayOfWeek + 8) % 7 - 1)
+        };
+      }
+      else if (DayOffsetRegex.TryMatch(date, out mtc))
+      {
+        lDate = zonedNow.Date + Period.FromDays(int.Parse(mtc.Value));
+      }
       else
       {
-        await ctx.RespondAsync($"{date} isn't a valid date!");
+        await ctx.RespondAsync($"{date} isn't a valid date!", true);
         return;
       }
     }
@@ -148,7 +190,7 @@ public static class TimeCommand
 
     if (map.Count == 0)
     {
-      await ctx.RespondAsync($"The date/time {ldt} is not a valid time in the time zone {zone}!");
+      await ctx.RespondAsync($"The date/time {ldt} is not a valid time in the time zone {zone}!", true);
       return;
     }
 
@@ -157,44 +199,59 @@ public static class TimeCommand
     // And lastly, get the unix timestamp value
     var unix = zonedTime.ToInstant().ToUnixTimeSeconds();
 
-    char formatChar = (format ?? Settings.TimeFormat) switch
+    // char formatChar = (format ?? Settings.TimeFormat) switch
+    // {
+    //   NixTimestampFormat.ShortDate => 'd',
+    //   NixTimestampFormat.LongDate => 'D',
+    //   NixTimestampFormat.LongDateTime => 'F',
+    //   NixTimestampFormat.ShortTime => 't',
+    //   NixTimestampFormat.LongTime => 'T',
+    //   NixTimestampFormat.RelativeTime => 'r',
+    //   _ => 'f' // default because saying nothing defaults to this too
+    // };
+
+    DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
     {
-      NixTimestampFormat.ShortDate => 'd',
-      NixTimestampFormat.LongDate => 'D',
-      NixTimestampFormat.LongDateTime => 'F',
-      NixTimestampFormat.ShortTime => 't',
-      NixTimestampFormat.LongTime => 'T',
-      NixTimestampFormat.RelativeTime => 'r',
-      _ => 'f' // default because saying nothing defaults to this too
+      Title = "Your requested timecode",
+      Description = $"You requested <t:{unix}:f> as a timecode. Here are your options:",
+      Color = new DiscordColor("#b42b42")
     };
 
-    await ctx.RespondAsync($@"<t:{unix}:{formatChar}>", true);
-    await ctx.FollowupAsync($@"\<t\:{unix}\:{formatChar}\>", true);
+    var formatChars = EnumerableUtils.Of(
+      ('d', "Short date"), ('D', "Long date"), ('f', "Short date/time"), ('f', "Long date/time"), ('t', "Short time"),
+      ('T', "Long time"), ('R', "Relative time"), ('\0', "Unix timestamp"));
+
+    if (format.HasValue)
+    {
+      formatChars = formatChars.Where(p => p.Item1 == format switch
+      {
+        NixTimestampFormat.ShortDate => 'd',
+        NixTimestampFormat.LongDate => 'D',
+        NixTimestampFormat.LongDateTime => 'F',
+        NixTimestampFormat.ShortTime => 't',
+        NixTimestampFormat.LongTime => 'T',
+        NixTimestampFormat.RelativeTime => 'r',
+        NixTimestampFormat.UnixTimestamp => '\0',
+        _ => 'f' // default because saying nothing defaults to this too
+      });
+    }
+
+    foreach ((char formatChar, string name) in formatChars)
+    {
+      if (formatChar == '\0')
+        embed.AddField(unix.ToString(), $"{name}: ```\n{unix.ToString()}\n```", true);
+      else
+        embed.AddField($"<t:{unix}:{formatChar}>", $"{name}: ```\n<t:{unix}:{formatChar}>\n```", true);
+    }
+
+    await ctx.RespondAsync(embed, ephemeral);
   }
 
   [Command("set")]
-  [InteractionInstallType(new DiscordApplicationIntegrationType[] {
-    // DiscordApplicationIntegrationType.GuildInstall,
-    DiscordApplicationIntegrationType.UserInstall
-  })]
-  [InteractionAllowedContexts(new DiscordInteractionContextType[] {
-    DiscordInteractionContextType.Guild,
-    DiscordInteractionContextType.BotDM,
-    DiscordInteractionContextType.PrivateChannel
-  })]
   public static class TimeSetCommand
   {
     [Command("zone")]
     [Description("Set the default time zone")]
-    [InteractionInstallType(new DiscordApplicationIntegrationType[] {
-      // DiscordApplicationIntegrationType.GuildInstall,
-      DiscordApplicationIntegrationType.UserInstall
-    })]
-    [InteractionAllowedContexts(new DiscordInteractionContextType[] {
-      DiscordInteractionContextType.Guild,
-      DiscordInteractionContextType.BotDM,
-      DiscordInteractionContextType.PrivateChannel
-    })]
     public static async Task SetZoneCommand(SlashCommandContext ctx,
       [Description("What time zone to set as default")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone
     )
@@ -203,32 +260,13 @@ public static class TimeCommand
       if (zoneForId != null)
       {
         Settings.TimeZone = zoneForId;
-        await ctx.RespondAsync($"Set your time zone to `{timezone}`!");
+        await ctx.RespondAsync($"Set your time zone to `{timezone}`!", true);
       }
       else
       {
-        await ctx.RespondAsync($"`{timezone}` is not a valid time zone.");
+        await ctx.RespondAsync($"`{timezone}` is not a valid time zone.", true);
         return;
       }
-    }
-
-    [Command("format")]
-    [Description("Set the default format")]
-    [InteractionInstallType(new DiscordApplicationIntegrationType[] {
-      // DiscordApplicationIntegrationType.GuildInstall,
-      DiscordApplicationIntegrationType.UserInstall
-    })]
-    [InteractionAllowedContexts(new DiscordInteractionContextType[] {
-      DiscordInteractionContextType.Guild,
-      DiscordInteractionContextType.BotDM,
-      DiscordInteractionContextType.PrivateChannel
-    })]
-    public static async Task SetFormatCommand(SlashCommandContext ctx,
-      [Description("What format to set as default")] NixTimestampFormat format
-    )
-    {
-      Settings.TimeFormat = format;
-      await ctx.RespondAsync($"Set your time format to {format}!");
     }
   }
 }

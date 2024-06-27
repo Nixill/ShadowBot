@@ -1,6 +1,8 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Commands;
+using DSharpPlus.Commands.Processors.MessageCommands;
 using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Entities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -29,19 +31,19 @@ public class ShadowBotMain
     DiscordClientBuilder builder = DiscordClientBuilder.CreateDefault(botToken, DiscordIntents.None);
     DiscordClient discord = builder.Build();
 
+    await discord.ConnectAsync();
+
     CommandsExtension commands = discord.UseCommands(
       new CommandsConfiguration()
       {
-        DebugGuildId = 299573383836729344L,
         RegisterDefaultCommandProcessors = false
       }
     );
 
     await commands.AddProcessorAsync(new SlashCommandProcessor());
+    await commands.AddProcessorAsync(new MessageCommandProcessor());
 
     commands.AddCommands(TopLevelCommandAttribute.GetTypesWith(typeof(ShadowBotMain).Assembly));
-
-    await discord.ConnectAsync();
 
     try
     {

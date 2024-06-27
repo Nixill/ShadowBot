@@ -32,11 +32,5 @@ public static class Settings
     set => SettingsObject.WritePath(value.Id, "time", "zone");
   }
 
-  public static NixTimestampFormat TimeFormat
-  {
-    get => ParseEnum<NixTimestampFormat>((string)SettingsObject.ReadPath("time", "format")) ?? NixTimestampFormat.ShortDateTime;
-    set => SettingsObject.WritePath(value.ToString(), "time", "format");
-  }
-
   public static void SaveObject() => File.WriteAllText("cfg/settings.json", SettingsObject.ToString());
 }
