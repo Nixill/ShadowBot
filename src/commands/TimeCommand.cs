@@ -9,6 +9,7 @@ using DSharpPlus.Commands.Processors.SlashCommands.Metadata;
 using DSharpPlus.Entities;
 using Nixill.Utils;
 using NodaTime;
+using NodaTime.Text;
 using NodaTime.TimeZones;
 
 namespace Nixill.Discord.ShadowBot;
@@ -41,6 +42,8 @@ public static class TimeCommand
   static readonly Regex DateRegex = new(@"^(?:(\d{4})[-/\.])?(\d?\d)[-/\.](\d\d)$");
   static readonly Regex DayOffsetRegex = new(@"^([-+]\d+|0)$");
 
+  static readonly ZonedDateTimePattern ConversionPattern = ZonedDateTimePattern.CreateWithInvariantCulture(@"ddd HH:mm:ss", null);
+
   static readonly ReadOnlyDictionary<string, string> DaysOfWeek = new Dictionary<string, string>()
   {
     ["su"] = "sunday",
@@ -56,30 +59,8 @@ public static class TimeCommand
     ["üb"] = "übermorgen"
   }.AsReadOnly();
 
-  [Command("code")]
-  [Description("Get the <t:...> code for a given time of day")]
-  public static async Task TimeCodeCommand(SlashCommandContext ctx,
-    [Description("The time to get")] string time,
-    [Description("The date to get")] string date = null,
-    [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
-    [Description("What format to use")] NixTimestampFormat? format = null,
-    [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
-    [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true
-  )
+  public static Instant GetInstantOf(string time, string date, DateTimeZone zone, bool? daylightSaving)
   {
-    DateTimeZone zone = Settings.TimeZone;
-
-    if (timezone != null)
-    {
-      DateTimeZone zoneForId = TzdbDateTimeZoneSource.Default.ForId(timezone);
-      if (zoneForId != null) zone = zoneForId;
-      else
-      {
-        await ctx.RespondAsync($"`{timezone}` is not a valid time zone.", true);
-        return;
-      }
-    }
-
     LocalTime lTime;
 
     { // just to make mtc reusable
@@ -103,16 +84,12 @@ public static class TimeCommand
 
         lTime = new(hour, minute, second);
       }
-      else
-      {
-        await ctx.RespondAsync($"`{time}` isn't a valid time!", true);
-        return;
-      }
+      else throw new UserInputException($"`{time}` isn't a valid time!");
     }
 
     LocalDate lDate;
 
-    date = date.ToLower();
+    date = date?.ToLower();
 
     var now = SystemClock.Instance.GetCurrentInstant();
     var zonedNow = now.InZone(zone);
@@ -165,11 +142,7 @@ public static class TimeCommand
       {
         lDate = zonedNow.Date + Period.FromDays(int.Parse(mtc.Value));
       }
-      else
-      {
-        await ctx.RespondAsync($"{date} isn't a valid date!", true);
-        return;
-      }
+      else throw new UserInputException($"{date} isn't a valid date!");
     }
     else
     {
@@ -188,27 +161,34 @@ public static class TimeCommand
 
     var map = zone.MapLocal(ldt);
 
-    if (map.Count == 0)
-    {
-      await ctx.RespondAsync($"The date/time {ldt} is not a valid time in the time zone {zone}!", true);
-      return;
-    }
+    if (map.Count == 0) throw new UserInputException($"The date/time {ldt} is not a valid time in the time zone {zone}!");
 
     var zonedTime = asDst ? map.First() : map.Last();
 
-    // And lastly, get the unix timestamp value
-    var unix = zonedTime.ToInstant().ToUnixTimeSeconds();
+    return zonedTime.ToInstant();
+  }
 
-    // char formatChar = (format ?? Settings.TimeFormat) switch
-    // {
-    //   NixTimestampFormat.ShortDate => 'd',
-    //   NixTimestampFormat.LongDate => 'D',
-    //   NixTimestampFormat.LongDateTime => 'F',
-    //   NixTimestampFormat.ShortTime => 't',
-    //   NixTimestampFormat.LongTime => 'T',
-    //   NixTimestampFormat.RelativeTime => 'r',
-    //   _ => 'f' // default because saying nothing defaults to this too
-    // };
+  [Command("code")]
+  [Description("Get the <t:...> code for a given time of day")]
+  public static async Task TimeCodeCommand(SlashCommandContext ctx,
+    [Description("The time to get")] string time,
+    [Description("The date to get")] string date = null,
+    [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
+    [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
+    [Description("What format to use")] NixTimestampFormat? format = null,
+    [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true
+  )
+  {
+    DateTimeZone zone = Settings.TimeZone;
+
+    if (timezone != null)
+    {
+      DateTimeZone zoneForId = TzdbDateTimeZoneSource.Default.ForId(timezone);
+      if (zoneForId != null) zone = zoneForId;
+      else throw new UserInputException($"`{timezone}` is not a valid time zone.");
+    }
+
+    var unix = GetInstantOf(time, date, zone, daylightSaving).ToUnixTimeSeconds();
 
     DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
     {
@@ -243,6 +223,45 @@ public static class TimeCommand
       else
         embed.AddField($"<t:{unix}:{formatChar}>", $"{name}: ```\n<t:{unix}:{formatChar}>\n```", true);
     }
+
+    await ctx.RespondAsync(embed, ephemeral);
+  }
+
+  [Command("convert")]
+  [Description("Show the time in another time zone")]
+  public static async Task TimeConvertCommand(SlashCommandContext ctx,
+    [Description("The time in your zone")] string time,
+    [Description("What time zone to convert to")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string targetTimezone,
+    [Description("The date in your zone")] string date = null,
+    [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
+    [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
+    [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true
+  )
+  {
+    DateTimeZone zone = Settings.TimeZone;
+
+    if (timezone != null)
+    {
+      DateTimeZone zoneForId = TzdbDateTimeZoneSource.Default.ForId(timezone);
+      if (zoneForId != null) zone = zoneForId;
+      else throw new UserInputException($"`{timezone}` is not a valid time zone.");
+    }
+
+    DateTimeZone targetZone = TzdbDateTimeZoneSource.Default.ForId(targetTimezone);
+    if (targetZone == null) throw new UserInputException($"`{targetTimezone}` is not a valid time zone.");
+
+    if (zone.Equals(targetZone)) throw new UserInputException("Those are the same time zone!");
+
+    Instant target = GetInstantOf(time, date, zone, daylightSaving);
+
+    DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
+    {
+      Description = $"You requested a conversion for <t:{target.ToUnixTimeSeconds()}:F>",
+      Color = new("#b42b42")
+    };
+
+    embed.AddField("Your time:", ConversionPattern.Format(target.InZone(zone)), true);
+    embed.AddField("Target time:", ConversionPattern.Format(target.InZone(targetZone)), true);
 
     await ctx.RespondAsync(embed, ephemeral);
   }

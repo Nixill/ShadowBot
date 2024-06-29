@@ -12,7 +12,7 @@ public class TimeZoneAutoCompleteProvider : IAutoCompleteProvider
 {
   public static readonly LocalTimePattern TimePtn = LocalTimePattern.CreateWithInvariantCulture("HH:mm");
   public static readonly LocalTimePattern OffsetPtn = LocalTimePattern.CreateWithInvariantCulture("h:mm tt");
-  public static readonly Regex PartialTimeRegex = new(@"(\d\d?)(?::?$|:(\d$|\d\d))? ?(?:([ap])\.?m?\.?)?");
+  public static readonly Regex PartialTimeRegex = new(@"^(\d\d?)(?::?$|:(\d$|\d\d))? ?(?:([ap])\.?m?\.?)$?");
 
   static readonly Period Filter = Period.FromSeconds(450);
   static readonly Period HalfDay = Period.FromHours(12);
@@ -21,10 +21,10 @@ public class TimeZoneAutoCompleteProvider : IAutoCompleteProvider
   public ValueTask<IReadOnlyDictionary<string, object>> AutoCompleteAsync(AutoCompleteContext ctx)
   {
     string input = ctx.UserInput;
-    return ValueTask.FromResult<IReadOnlyDictionary<string, object>>(GetZonesFor(input).Take(25).ToDictionary().AsReadOnly());
+    return ValueTask.FromResult<IReadOnlyDictionary<string, object>>(GetZonesFor(input).DistinctBy(x => x.Name).Take(25).ToDictionary().AsReadOnly());
   }
 
-  public IEnumerable<(string, object)> GetZonesFor(string input)
+  public IEnumerable<(string Name, object Key)> GetZonesFor(string input)
   {
     Instant now = SystemClock.Instance.GetCurrentInstant();
 
@@ -143,7 +143,7 @@ public class TimeZoneAutoCompleteProvider : IAutoCompleteProvider
       if (index != -1) yield return (zone, time, id, 2, index);
 
       int chr = 0;
-      foreach ((char c, int i) in id.Select((c, i) => (c, i)))
+      foreach ((char c, int i) in lowId.Select((c, i) => (c, i)))
       {
         if (c == search[chr])
         {

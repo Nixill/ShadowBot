@@ -29,6 +29,11 @@ public class ShadowBotMain
     IServiceProvider serviceProvider = new ServiceCollection().AddLogging(x => x.AddConsole()).BuildServiceProvider();
 
     DiscordClientBuilder builder = DiscordClientBuilder.CreateDefault(botToken, DiscordIntents.None);
+    builder.SetLogLevel(LogLevel.Trace);
+
+    // builder.ConfigureEventHandlers(
+    // );
+
     DiscordClient discord = builder.Build();
 
     await discord.ConnectAsync();
@@ -36,12 +41,15 @@ public class ShadowBotMain
     CommandsExtension commands = discord.UseCommands(
       new CommandsConfiguration()
       {
-        RegisterDefaultCommandProcessors = false
+        RegisterDefaultCommandProcessors = false,
+        UseDefaultCommandErrorHandler = false
       }
     );
 
     await commands.AddProcessorAsync(new SlashCommandProcessor());
     await commands.AddProcessorAsync(new MessageCommandProcessor());
+
+    commands.CommandErrored += CommandErrorHandler.OnCommandErrored;
 
     commands.AddCommands(TopLevelCommandAttribute.GetTypesWith(typeof(ShadowBotMain).Assembly));
 
