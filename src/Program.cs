@@ -17,11 +17,6 @@ public class ShadowBotMain
   public static async Task MainAsync()
   {
     // Let's get the bot set up
-#if DEBUG
-    Console.WriteLine("Debug mode active");
-#else
-    Console.WriteLine("Debug mode not active");
-#endif
     string botToken = File.ReadAllText("cfg/token");
 
     ulong OwnerID = ulong.Parse(File.ReadAllText("cfg/owner"));
@@ -42,7 +37,8 @@ public class ShadowBotMain
       new CommandsConfiguration()
       {
         RegisterDefaultCommandProcessors = false,
-        UseDefaultCommandErrorHandler = false
+        UseDefaultCommandErrorHandler = false,
+        DebugGuildId = Settings.DebugGuildId
       }
     );
 

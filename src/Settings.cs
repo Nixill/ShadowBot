@@ -26,6 +26,8 @@ public static class Settings
 
   static readonly JsonObject SettingsObject = GetSettingsObject();
 
+  public static ulong DebugGuildId => SettingsObject.ContainsKey("debugGuild") ? (ulong)SettingsObject["debugGuild"] : 0;
+
   public static DateTimeZone TimeZone
   {
     get => TzdbDateTimeZoneSource.Default.ForId((string)SettingsObject.ReadPath("time", "zone") ?? "America/Detroit");
