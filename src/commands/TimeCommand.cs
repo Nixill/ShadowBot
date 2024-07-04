@@ -176,7 +176,8 @@ public static class TimeCommand
     [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
     [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
     [Description("What format to use")] NixTimestampFormat? format = null,
-    [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true
+    [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true,
+    [Description("Show in detail?")] bool detailed = true
   )
   {
     DateTimeZone zone = Settings.TimeZone;
@@ -188,20 +189,11 @@ public static class TimeCommand
       else throw new UserInputException($"`{timezone}` is not a valid time zone.");
     }
 
-    var unix = GetInstantOf(time, date, zone, daylightSaving).ToUnixTimeSeconds();
-
-    DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
-    {
-      Title = "Your requested timecode",
-      Description = $"You requested <t:{unix}:f> as a timecode. Here are your options:",
-      Color = new DiscordColor("#b42b42")
-    };
-
     var formatChars = EnumerableUtils.Of(
-      ('d', "Short date"), ('D', "Long date"), ('f', "Short date/time"), ('f', "Long date/time"), ('t', "Short time"),
+      ('d', "Short date"), ('D', "Long date"), ('f', "Short date/time"), ('F', "Long date/time"), ('t', "Short time"),
       ('T', "Long time"), ('R', "Relative time"), ('\0', "Unix timestamp"));
 
-    if (format.HasValue)
+    if (format.HasValue || !detailed)
     {
       formatChars = formatChars.Where(p => p.Item1 == format switch
       {
@@ -216,15 +208,36 @@ public static class TimeCommand
       });
     }
 
-    foreach ((char formatChar, string name) in formatChars)
-    {
-      if (formatChar == '\0')
-        embed.AddField(unix.ToString(), $"{name}: ```\n{unix.ToString()}\n```", true);
-      else
-        embed.AddField($"<t:{unix}:{formatChar}>", $"{name}: ```\n<t:{unix}:{formatChar}>\n```", true);
-    }
+    var unix = GetInstantOf(time, date, zone, daylightSaving).ToUnixTimeSeconds();
 
-    await ctx.RespondAsync(embed, ephemeral);
+    if (detailed)
+    {
+      DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
+      {
+        Title = "Your requested timecode",
+        Description = $"You requested <t:{unix}:f> as a timecode. Here are your options:",
+        Color = new DiscordColor("#b42b42")
+      };
+
+      foreach ((char formatChar, string name) in formatChars)
+      {
+        if (formatChar == '\0')
+          embed.AddField(unix.ToString(), $"{name}: ```\n{unix.ToString()}\n```", true);
+        else
+          embed.AddField($"<t:{unix}:{formatChar}>", $"{name}: ```\n<t:{unix}:{formatChar}>\n```", true);
+      }
+
+      await ctx.RespondAsync(embed, ephemeral);
+    }
+    else
+    {
+      (char formatChar, string _) = formatChars.First();
+
+      if (formatChar == '\0')
+        await ctx.RespondAsync(unix.ToString());
+      else
+        await ctx.RespondAsync($"<t:{unix}:{formatChar}>");
+    }
   }
 
   [Command("convert")]

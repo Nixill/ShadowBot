@@ -16,7 +16,7 @@ public static class SnowflakeFunc
   internal static ulong Milliseconds(ulong snowflake) => snowflake >> 22;
   internal static Instant InstantOf(ulong snowflake) => Epoch + Duration.FromMilliseconds(Milliseconds(snowflake));
   internal static string Description(ulong stamp) => Description(stamp, InstantOf(stamp));
-  internal static string Description(ulong stamp, Instant time) => $"{stamp}: <t:{time.ToUnixTimeSeconds()}:f> (+ `{time.ToUnixTimeMilliseconds() % 1000:000}` ms)";
+  internal static string Description(ulong stamp, Instant time) => $"{stamp}: <t:{time.ToUnixTimeSeconds()}:d> <t:{time.ToUnixTimeSeconds()}:T> (+ `{time.ToUnixTimeMilliseconds() % 1000:000}` ms)";
 }
 
 [InteractionAllowedContexts(
