@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.Processors.SlashCommands;
@@ -37,6 +38,7 @@ public static class VersionCommandClass
     DiscordApplicationIntegrationType.UserInstall
   )]
   [Command("version")]
+  [Description("Get the version of the bot")]
   public static async Task VersionCommand(SlashCommandContext ctx)
   {
     await ctx.DeferResponseAsync(true);
@@ -44,9 +46,23 @@ public static class VersionCommandClass
     var hash = Run("git", "rev-parse HEAD");
     var msg = Run("git", "log -1 --pretty=%B");
     var tag = Run("git", "describe --tags --abbrev=0");
+    var unc = Run("git", "diff --quiet");
 
-    await ctx.EditResponseAsync($"I am running {(
-      tag.Result.Success ? $"version `{tag.Result.Output.Trim()}`" : "an untagged repository"
-    )} on commit hash `{hash.Result.Output.Trim()}` (\"{(msg.Result.Output.Trim())}\")");
+    string hashString = hash.Result.Output.Trim();
+    string messageString = msg.Result.Output.Split('\n')[0].Trim();
+    string versionString = tag.Result.Success ? $"version `{tag.Result.Output.Trim()}`" : "an untagged version";
+
+    string response = $"I am running {versionString} on commit `{hashString}` (\"{messageString}\")"
+      + (unc.Result.Success ? "." : ", plus further uncommitted changes.");
+
+    DiscordMessageBuilder message = new DiscordMessageBuilder()
+    {
+      Content = response
+    }.AddComponents(new DiscordLinkButtonComponent(
+      $"https://github.com/StevenH237/ShadowBot/tree/{hashString}",
+      "Browse repository here"
+    ));
+
+    await ctx.EditResponseAsync(message);
   }
 }
