@@ -10,9 +10,9 @@ namespace Nixill;
 
 public static class UrlShortener
 {
-  public static Uri Shorten(string input) => Shorten(new Uri(input));
+  public static IEnumerable<Uri> Shorten(string input) => Shorten(new Uri(input));
 
-  public static Uri Shorten(Uri input)
+  public static IEnumerable<Uri> Shorten(Uri input)
   {
     if (Regex.IsMatch(input.Host, @"^(www\.)?amazon\.(com|co\.uk|de|ca)"))
     {
@@ -20,10 +20,15 @@ public static class UrlShortener
       return ShortenAmazon(input);
     }
 
-    return input;
+    else if (Regex.IsMatch(input.Host, @"^(www\.)?humble(bundle)?\.com"))
+    {
+      return ShortenHumble(input);
+    }
+
+    return Enumerable.Empty<Uri>();
   }
 
-  public static Uri ShortenAmazon(Uri input)
+  public static IEnumerable<Uri> ShortenAmazon(Uri input)
   {
     List<string> segments = input.Segments.ToList();
 
@@ -31,13 +36,19 @@ public static class UrlShortener
 
     if (segments[2] == "dp/")
     {
-      return new Uri($"{input.Scheme}://{input.Host}/{segments[2]}{segments[3]}");
+      yield return new Uri($"{input.Scheme}://{input.Host}/{segments[2]}{segments[3]}");
     }
     else if (segments[1] == "dp/")
     {
-      return new Uri($"{input.Scheme}://{input.Host}/{segments[1]}{segments[2]}");
+      yield return new Uri($"{input.Scheme}://{input.Host}/{segments[1]}{segments[2]}");
     }
+  }
 
-    return input;
+  public static IEnumerable<Uri> ShortenHumble(Uri input)
+  {
+    // For legal reasons: This is an affiliate link. If you buy something
+    // from this link, I will earn a small cut.
+    yield return new Uri($"https://humblebundle.com{input.AbsolutePath}?partner=nixill&charity=1599605");
+    yield return new Uri($"https://humblebundle.com{input.AbsolutePath}");
   }
 }
