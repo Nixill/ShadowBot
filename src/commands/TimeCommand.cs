@@ -59,32 +59,38 @@ public static class TimeCommand
     ["üb"] = "übermorgen"
   }.AsReadOnly();
 
+  public static bool TryParseTime(string input, out LocalTime time)
+  {
+    if (TimeRegex.TryMatch(input.ToLower(), out Match mtc))
+    {
+      int hour = int.Parse(mtc.Groups[1].Value);
+      int minute = int.Parse(mtc.Groups[2].Value);
+      int second = 0;
+
+      if (mtc.Groups[3].Success)
+        second = int.Parse(mtc.Groups[3].Value);
+
+      if (mtc.Groups[4].Success)
+      {
+        if (hour == 12)
+        {
+          if (mtc.Groups[4].Value == "a") hour = 0;
+        }
+        else if (mtc.Groups[4].Value == "p") hour += 12;
+      }
+
+      time = new(hour, minute, second);
+      return true;
+    }
+    time = default(LocalTime);
+    return false;
+  }
+
   public static Instant GetInstantOf(string time, string date, DateTimeZone zone, bool? daylightSaving)
   {
-    LocalTime lTime;
-
-    { // just to make mtc reusable
-      if (TimeRegex.TryMatch(time.ToLower(), out Match mtc))
-      {
-        int hour = int.Parse(mtc.Groups[1].Value);
-        int minute = int.Parse(mtc.Groups[2].Value);
-        int second = 0;
-
-        if (mtc.Groups[3].Success)
-          second = int.Parse(mtc.Groups[3].Value);
-
-        if (mtc.Groups[4].Success)
-        {
-          if (hour == 12)
-          {
-            if (mtc.Groups[4].Value == "a") hour = 0;
-          }
-          else if (mtc.Groups[4].Value == "p") hour += 12;
-        }
-
-        lTime = new(hour, minute, second);
-      }
-      else throw new UserInputException($"`{time}` isn't a valid time!");
+    if (!TryParseTime(time, out LocalTime lTime))
+    {
+      throw new UserInputException($"{time} isn't a valid time!");
     }
 
     LocalDate lDate;
