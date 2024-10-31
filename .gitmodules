@@ -1,0 +1,3 @@
+[submodule "CSharp.Nixill"]
+	path = CSharp.Nixill
+	url = https://github.com/StevenH237/CSharp.Nixill

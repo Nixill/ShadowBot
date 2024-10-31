@@ -2,7 +2,6 @@ using System.Text.RegularExpressions;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using Nixill.Utils;
-using Nixill.Utils.Temp;
 using NodaTime;
 using NodaTime.Text;
 
@@ -15,14 +14,16 @@ public class DateAutoCompleteProvider : IAutoCompleteProvider
     .Select(e => (e.ToString().ToLower(), e))
     .ToDictionary();
 
-  static readonly IReadOnlyDictionary<string, Period> OffsetDays = new Dictionary<string, Period> {
+  static readonly IReadOnlyDictionary<string, Period> OffsetDays = new Dictionary<string, Period>
+  {
     ["today"] = Period.Zero,
     ["yesterday"] = Days(-1),
     ["tomorrow"] = Day,
     ["ubermorgen"] = Days(2)
   };
 
-  static readonly IReadOnlyDictionary<string, int> MonthNames = new Dictionary<string, int> {
+  static readonly IReadOnlyDictionary<string, int> MonthNames = new Dictionary<string, int>
+  {
     ["january"] = 1,
     ["february"] = 2,
     ["march"] = 3,
@@ -70,7 +71,7 @@ public class DateAutoCompleteProvider : IAutoCompleteProvider
     LocalDate today = Today;
 
     Match mtc;
-    
+
     if (input == "")
     {
       // Output -1 to +7 days
@@ -95,7 +96,7 @@ public class DateAutoCompleteProvider : IAutoCompleteProvider
 
         for (LocalDate date = today - Day; date <= today.PlusMonths(1); date += Day)
         {
-          
+
         }
 
         // Current day, given month?
