@@ -7,7 +7,7 @@ using NodaTime.Text;
 
 namespace Nixill.Discord.ShadowBot;
 
-public class DateAutoCompleteProvider : IAutoCompleteProvider
+public partial class DateAutoCompleteProvider : IAutoCompleteProvider
 {
   static readonly IReadOnlyDictionary<string, IsoDayOfWeek> DaysOfWeek = Enum.GetValues<IsoDayOfWeek>()
     .Except([IsoDayOfWeek.None])
@@ -46,7 +46,28 @@ public class DateAutoCompleteProvider : IAutoCompleteProvider
   public async ValueTask<IReadOnlyDictionary<string, object>> AutoCompleteAsync(AutoCompleteContext ctx)
   {
     await Task.Delay(0);
-    return GetDates(ctx).DistinctBy(x => x.Item2).ToDictionary();
+    IEnumerable<(string, LocalDate)> dates = GetDates(ctx);
+
+    try {
+      LocalDate date = TimeCommand.ParseDate(ctx.UserInput, Now.InZone(Settings.TimeZone));
+      dates.Prepend(DateTuple("Current input", date));
+    } catch (UserInputException) {}
+
+    LocalDate today = Today;
+
+    return dates
+      .DistinctBy(p => p.Item2)
+      .Order(Comparer<(string, LocalDate)>.Create((l, r) => {
+
+        int leftPeriod = int.Abs(Period.DaysBetween(today, l.Item2));
+        int rightPeriod = int.Abs(Period.DaysBetween(today, r.Item2));
+
+        if (leftPeriod != rightPeriod) return leftPeriod.CompareTo(rightPeriod);
+        return -(l.CompareTo(r));
+      }))
+      .Take(25)
+      .Select(p => ((string,object))(p.Item1, Iso(p.Item2)))
+      .ToDictionary();
   }
 
   static string Iso(LocalDate date) => LocalDatePattern.Iso.Format(date);
@@ -55,9 +76,9 @@ public class DateAutoCompleteProvider : IAutoCompleteProvider
   static readonly Regex Signed = new(@"^[-+]\d+$");
   static readonly Regex Hyphen = new(@"^(\d\d?)[\.\-\/](\d*)$");
 
-  static (string, object) DateTuple(LocalDate date) => (Iso(date), Iso(date));
-  static (string, object) DateTuple(string comment, LocalDate date) => ($"{comment} ({Iso(date)})", Iso(date));
-  static (string, object) DateTuple(Func<LocalDate, object> comment, LocalDate date) => ($"{comment(date)} ({Iso(date)})", Iso(date));
+  static (string, LocalDate) DateTuple(LocalDate date) => (Iso(date), date);
+  static (string, LocalDate) DateTuple(string comment, LocalDate date) => ($"{comment} ({Iso(date)})", date);
+  static (string, LocalDate) DateTuple(Func<LocalDate, object> comment, LocalDate date) => ($"{comment(date)} ({Iso(date)})", date);
 
   static string Ordinal(int i) => (i % 100 >= 11 && i % 100 <= 13) ? $"{i}th"
     : (i % 10 == 1) ? $"{i}st"
@@ -65,7 +86,7 @@ public class DateAutoCompleteProvider : IAutoCompleteProvider
     : (i % 10 == 3) ? $"{i}rd"
     : $"{i}th";
 
-  private IEnumerable<(string, object)> GetDates(AutoCompleteContext ctx)
+  private IEnumerable<(string, LocalDate)> GetDates(AutoCompleteContext ctx)
   {
     string input = ctx.UserInput;
     LocalDate today = Today;
@@ -73,34 +94,23 @@ public class DateAutoCompleteProvider : IAutoCompleteProvider
     Match mtc;
 
     if (input == "")
-    {
-      // Output -1 to +7 days
-      yield return DateTuple("Today", today);
-      yield return DateTuple("Tomorrow", today + Day);
-      yield return DateTuple("Yesterday", today - Day);
-      foreach (int i in Enumerable.Range(2, 4))
-        yield return DateTuple(d => d.DayOfWeek, today + Days(i));
-      foreach (int i in Enumerable.Range(6, 2))
-        yield return DateTuple(d => $"Next {d.DayOfWeek}", today + Days(i));
-      yield break;
-    }
+      return GetDatesBlank();
     else if (DigitsOnly.TryMatch(input, out mtc))
-    {
-      // Only output anything if it can be parsed to a number
-      if (!int.TryParse(input, out int number)) yield break;
+      return GetDatesDigits(input);
+  }
 
-      if (input.Length == 1)
-      {
-        // Current month, given day?
-        var daysInMonth = CalendarSystem.Gregorian.GetDaysInMonth(today.Year, today.Month);
+  private IEnumerable<(string, LocalDate)> GetDatesBlank()
+  {
+    LocalDate today = Today;
 
-        for (LocalDate date = today - Day; date <= today.PlusMonths(1); date += Day)
-        {
-
-        }
-
-        // Current day, given month?
-      }
-    }
+    // Output -1 to +7 days
+    yield return DateTuple("Today", today);
+    yield return DateTuple("Tomorrow", today + Day);
+    yield return DateTuple("Yesterday", today - Day);
+    foreach (int i in Enumerable.Range(2, 4))
+      yield return DateTuple(d => d.DayOfWeek, today + Days(i));
+    foreach (int i in Enumerable.Range(6, 2))
+      yield return DateTuple(d => $"Next {d.DayOfWeek}", today + Days(i));
+    yield break;
   }
 }

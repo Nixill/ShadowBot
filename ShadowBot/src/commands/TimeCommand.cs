@@ -93,62 +93,16 @@ public static class TimeCommand
       throw new UserInputException($"{time} isn't a valid time!");
     }
 
-    LocalDate lDate;
-
     date = date?.ToLower();
 
     var now = SystemClock.Instance.GetCurrentInstant();
     var zonedNow = now.InZone(zone);
     var localNow = zonedNow.LocalDateTime - Period.FromHours(1);
+    LocalDate lDate;
 
     if (date != null)
     {
-      if (DateRegex.TryMatch(date, out Match mtc))
-      {
-        int year = zonedNow.Year;
-        int month = int.Parse(mtc.Groups[2].Value);
-        int day = int.Parse(mtc.Groups[3].Value);
-
-        if (mtc.Groups[1].Success) year = int.Parse(mtc.Groups[1].Value);
-
-        lDate = new(year, month, day);
-      }
-      else if (date.Length >= 3
-        && date.Length <= 8
-        && ("tomorrow")[0..date.Length] == date)
-      {
-        lDate = zonedNow.Date + Period.FromDays(1);
-      }
-      else if (date.Length >= 2
-        && DaysOfWeek.TryGetValue(date[0..2], out string pickedDay)
-        && date.Length <= pickedDay.Length
-        && pickedDay[0..date.Length] == date)
-      {
-        lDate = pickedDay switch
-        {
-          "today" or "yesterday" or "ubermorgen" or "übermorgen" => zonedNow.Date + Period.FromDays(pickedDay switch
-          {
-            "today" => 0,
-            "yesterday" => -1,
-            _ => 2
-          }),
-          _ => zonedNow.Date + Period.FromDays((pickedDay switch
-          {
-            "monday" => 1,
-            "tuesday" => 2,
-            "wednesday" => 3,
-            "thursday" => 4,
-            "friday" => 5,
-            "saturday" => 6,
-            _ => 7
-          } - (int)zonedNow.DayOfWeek + 8) % 7 - 1)
-        };
-      }
-      else if (DayOffsetRegex.TryMatch(date, out mtc))
-      {
-        lDate = zonedNow.Date + Period.FromDays(int.Parse(mtc.Value));
-      }
-      else throw new UserInputException($"{date} isn't a valid date!");
+      lDate = ParseDate(date, zonedNow);
     }
     else
     {
@@ -174,17 +128,69 @@ public static class TimeCommand
     return zonedTime.ToInstant();
   }
 
+  internal static LocalDate ParseDate(string date, ZonedDateTime zonedNow)
+  {
+    LocalDate lDate;
+    if (DateRegex.TryMatch(date, out Match mtc))
+    {
+      int year = zonedNow.Year;
+      int month = int.Parse(mtc.Groups[2].Value);
+      int day = int.Parse(mtc.Groups[3].Value);
+
+      if (mtc.Groups[1].Success) year = int.Parse(mtc.Groups[1].Value);
+
+      lDate = new(year, month, day);
+    }
+    else if (date.Length >= 3
+      && date.Length <= 8
+      && ("tomorrow")[0..date.Length] == date)
+    {
+      lDate = zonedNow.Date + Period.FromDays(1);
+    }
+    else if (date.Length >= 2
+      && DaysOfWeek.TryGetValue(date[0..2], out string pickedDay)
+      && date.Length <= pickedDay.Length
+      && pickedDay[0..date.Length] == date)
+    {
+      lDate = pickedDay switch
+      {
+        "today" or "yesterday" or "ubermorgen" or "übermorgen" => zonedNow.Date + Period.FromDays(pickedDay switch
+        {
+          "today" => 0,
+          "yesterday" => -1,
+          _ => 2
+        }),
+        _ => zonedNow.Date + Period.FromDays((pickedDay switch
+        {
+          "monday" => 1,
+          "tuesday" => 2,
+          "wednesday" => 3,
+          "thursday" => 4,
+          "friday" => 5,
+          "saturday" => 6,
+          _ => 7
+        } - (int)zonedNow.DayOfWeek + 8) % 7 - 1)
+      };
+    }
+    else if (DayOffsetRegex.TryMatch(date, out mtc))
+    {
+      lDate = zonedNow.Date + Period.FromDays(int.Parse(mtc.Value));
+    }
+    else throw new UserInputException($"{date} isn't a valid date!");
+    return lDate;
+  }
+
   [Command("code")]
   [Description("Get the <t:...> code for a given time of day")]
   public static async Task TimeCodeCommand(SlashCommandContext ctx,
-    [Description("The time to get")] string time,
-    [Description("The date to get")] string date = null,
-    [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
-    [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
-    [Description("What format to use")] NixTimestampFormat? format = null,
-    [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true,
-    [Description("Show in detail?")] bool detailed = true
-  )
+  [Description("The time to get")] string time,
+  [Description("The date to get")] string date = null,
+  [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
+  [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
+  [Description("What format to use")] NixTimestampFormat? format = null,
+  [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true,
+  [Description("Show in detail?")] bool detailed = true
+)
   {
     DateTimeZone zone = Settings.TimeZone;
 
