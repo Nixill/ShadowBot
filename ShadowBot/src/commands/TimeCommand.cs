@@ -184,7 +184,7 @@ public static class TimeCommand
   [Description("Get the <t:...> code for a given time of day")]
   public static async Task TimeCodeCommand(SlashCommandContext ctx,
   [Description("The time to get")] string time,
-  [Description("The date to get")] string date = null,
+  [Description("The date to get")][SlashAutoCompleteProvider<DateAutoCompleteProvider>] string date = null,
   [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
   [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
   [Description("What format to use")] NixTimestampFormat? format = null,
