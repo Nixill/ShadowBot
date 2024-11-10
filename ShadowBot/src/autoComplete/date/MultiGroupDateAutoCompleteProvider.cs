@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
-using Nixill.Utils;
+using Nixill.Utils.Extensions;
 using NodaTime;
 using NodaTime.Text;
 

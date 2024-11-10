@@ -1,5 +1,5 @@
 using System.Text.Json.Nodes;
-using Nixill.Utils;
+using Nixill.Utils.Extensions;
 using NodaTime;
 using NodaTime.TimeZones;
 

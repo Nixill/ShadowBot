@@ -1,5 +1,6 @@
 using Nixill.Discord.ShadowBot;
 using Nixill.Utils;
+using Nixill.Utils.Extensions;
 using NodaTime;
 
 namespace Nixill;
@@ -36,7 +37,7 @@ public static class DateMath
     int startYear = baseDate.Year;
     if (baseAD <= date) startYear -= 1;
     if (strict)
-      return date.InYear(EnumerableUtils.ForUntil(startYear, year => date.IsValidYear(year), year => year - 1));
+      return date.InYear(Sequence.ForUntil(startYear, year => date.IsValidYear(year), year => year - 1));
     else return date.InYear(startYear);
   }
 
@@ -51,7 +52,7 @@ public static class DateMath
     int startYear = baseDate.Year;
     if (baseAD >= date) startYear += 1;
     if (strict)
-      return date.InYear(EnumerableUtils.ForUntil(startYear, year => date.IsValidYear(year), year => year + 1));
+      return date.InYear(Sequence.ForUntil(startYear, year => date.IsValidYear(year), year => year + 1));
     else return date.InYear(startYear);
   }
 

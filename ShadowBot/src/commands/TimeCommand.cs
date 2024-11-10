@@ -8,6 +8,7 @@ using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Commands.Processors.SlashCommands.Metadata;
 using DSharpPlus.Entities;
 using Nixill.Utils;
+using Nixill.Utils.Extensions;
 using NodaTime;
 using NodaTime.Text;
 using NodaTime.TimeZones;
@@ -201,7 +202,7 @@ public static class TimeCommand
       else throw new UserInputException($"`{timezone}` is not a valid time zone.");
     }
 
-    var formatChars = EnumerableUtils.Of(
+    var formatChars = Sequence.Of(
       ('d', "Short date"), ('D', "Long date"), ('f', "Short date/time"), ('F', "Long date/time"), ('t', "Short time"),
       ('T', "Long time"), ('R', "Relative time"), ('\0', "Unix timestamp"));
 

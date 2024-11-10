@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using Nixill.Utils;
+using Nixill.Utils.Extensions;
 using NodaTime;
 using NodaTime.Text;
 
@@ -80,7 +81,7 @@ public partial class DateAutoCompleteProvider : IAutoCompleteProvider
   static string Iso(LocalDate date) => LocalDatePattern.Iso.Format(date);
 
   static IEnumerable<LocalDate> AllDatesInRange(LocalDate start, LocalDate end)
-    => EnumerableUtils.For(start, d => d <= end, d => d.PlusDays(1));
+    => Sequence.For(start, d => d <= end, d => d.PlusDays(1));
 
   static readonly Regex DigitsOnly = new(@"^\d+$");
   static readonly Regex Signed = new(@"^[-+]\d+$");

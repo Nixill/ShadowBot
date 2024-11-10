@@ -1,6 +1,6 @@
 using System.Text;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
-using Nixill.Utils;
+using Nixill.Utils.Extensions;
 using NodaTime;
 using NodaTime.Text;
 
@@ -105,7 +105,7 @@ public partial class DateAutoCompleteProvider : IAutoCompleteProvider
       }
 
       foreach (LocalDate date in AllDatesInRange(start, end).Where(d => d.Day == number))
-        yield return DateTuple(d => DateName(d).SJoin(""), date);
+        yield return DateTuple(d => DateName(d).StringJoin(""), date);
     }
 
     if (number >= 1 && number <= 12)

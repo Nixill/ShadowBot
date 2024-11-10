@@ -4,7 +4,7 @@ using DSharpPlus.Commands;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.Metadata;
 using DSharpPlus.Entities;
-using Nixill.Utils;
+using Nixill.Utils.Extensions;
 using NodaTime;
 
 namespace Nixill.Discord.ShadowBot;

@@ -4,7 +4,7 @@ using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Commands.Processors.SlashCommands.Metadata;
 using DSharpPlus.Entities;
-using Nixill.Utils;
+using Nixill.Utils.Extensions;
 
 namespace Nixill.Discord.ShadowBot;
 
@@ -38,7 +38,7 @@ public static class LinkCommand
 
     await ctx.RespondAsync($"{shortened[0]}", ephemeral);
     if (shortened.Count() > 1)
-      await ctx.FollowupAsync($"Others:\n<{shortened.Skip(1).SJoin(">\n<")}>", true);
+      await ctx.FollowupAsync($"Others:\n<{shortened.Skip(1).StringJoin(">\n<")}>", true);
   }
 
   [Command("get")]
