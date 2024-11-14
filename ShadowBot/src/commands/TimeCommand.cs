@@ -182,16 +182,33 @@ public static class TimeCommand
   }
 
   [Command("code")]
-  [Description("Get the <t:...> code for a given time of day")]
+  [Description("Get the <t:...> code for a given time of day (defaults to visible)")]
   public static async Task TimeCodeCommand(SlashCommandContext ctx,
-  [Description("The time to get")] string time,
-  [Description("The date to get")][SlashAutoCompleteProvider<DateAutoCompleteProvider>] string date = null,
-  [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
-  [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
-  [Description("What format to use")] NixTimestampFormat? format = null,
-  [Description("Hide from others? (May be forced by the server anyway.)")] bool ephemeral = true,
-  [Description("Show in detail?")] bool detailed = true
-)
+    [Description("The time to get")] string time,
+    [Description("The date to get")][SlashAutoCompleteProvider<DateAutoCompleteProvider>] string date = null,
+    [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
+    [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
+    [Description("What format to use")] NixTimestampFormat? format = null,
+    [Description("Hide from others? (May be forced by the server anyway.)")] bool? ephemeral = null,
+    [Description("Show in detail?")] bool? detailed = null
+  )
+  => await TimeCodeCommands(ctx, time, date, timezone, daylightSaving, format, ephemeral, detailed, true);
+
+  [Command("codes")]
+  [Description("Get the <t:...> codes for a given time of day (defaults to ephemeral)")]
+  public static async Task TimeCodesCommand(SlashCommandContext ctx,
+    [Description("The time to get")] string time,
+    [Description("The date to get")][SlashAutoCompleteProvider<DateAutoCompleteProvider>] string date = null,
+    [Description("What time zone to use")][SlashAutoCompleteProvider<TimeZoneAutoCompleteProvider>] string timezone = null,
+    [Description("Is entered time daylight saving time? Only has any effect for ambiguous times.")] bool? daylightSaving = null,
+    [Description("What format to use")] NixTimestampFormat? format = null,
+    [Description("Hide from others? (May be forced by the server anyway.)")] bool? ephemeral = null,
+    [Description("Show in detail?")] bool? detailed = null
+  )
+  => await TimeCodeCommands(ctx, time, date, timezone, daylightSaving, format, ephemeral, detailed, false);
+
+  public static async Task TimeCodeCommands(SlashCommandContext ctx, string time, string date, string timezone,
+    bool? daylightSaving, NixTimestampFormat? format, bool? ephemeral, bool? detailed, bool isCodeCommand)
   {
     DateTimeZone zone = Settings.TimeZone;
 
@@ -206,7 +223,10 @@ public static class TimeCommand
       ('d', "Short date"), ('D', "Long date"), ('f', "Short date/time"), ('F', "Long date/time"), ('t', "Short time"),
       ('T', "Long time"), ('R', "Relative time"), ('\0', "Unix timestamp"));
 
-    if (format.HasValue || !detailed)
+    var instant = GetInstantOf(time, date, zone, daylightSaving);
+    var unix = instant.ToUnixTimeSeconds();
+
+    if (format.HasValue || detailed == false)
     {
       formatChars = formatChars.Where(p => p.Item1 == format switch
       {
@@ -221,9 +241,14 @@ public static class TimeCommand
       });
     }
 
-    var unix = GetInstantOf(time, date, zone, daylightSaving).ToUnixTimeSeconds();
+    else if (format == null && isCodeCommand)
+    {
+      if (date != null) formatChars = [('d', "Short date")];
+      else if (unix % 60 != 0) formatChars = [('T', "Long time")];
+      else formatChars = [('t', "Short time")];
+    }
 
-    if (detailed)
+    if (detailed ?? !isCodeCommand)
     {
       DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
       {
@@ -240,16 +265,16 @@ public static class TimeCommand
           embed.AddField($"<t:{unix}:{formatChar}>", $"{name}: ```\n<t:{unix}:{formatChar}>\n```", true);
       }
 
-      await ctx.RespondAsync(embed, ephemeral);
+      await ctx.RespondAsync(embed, ephemeral ?? !isCodeCommand);
     }
     else
     {
       (char formatChar, string _) = formatChars.First();
 
       if (formatChar == '\0')
-        await ctx.RespondAsync(unix.ToString());
+        await ctx.RespondAsync(unix.ToString(), ephemeral ?? !isCodeCommand);
       else
-        await ctx.RespondAsync($"<t:{unix}:{formatChar}>");
+        await ctx.RespondAsync($"<t:{unix}:{formatChar}>", ephemeral ?? !isCodeCommand);
     }
   }
 
