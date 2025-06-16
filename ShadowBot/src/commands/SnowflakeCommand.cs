@@ -98,7 +98,7 @@ public static class SnowflakeMessageCommand
   {
     DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
     {
-      Description = $"Your selected message: [This one]({msg.JumpLink})",
+      Description = $"Your selected message: [This one]({msg.JumpLink}) - {msg.Content.Substring(0, int.Min(100, msg.Content.Length))}",
       Color = new DiscordColor("b42b42")
     };
 
