@@ -24,7 +24,20 @@ public class ShadowBotMain
     IServiceProvider serviceProvider = new ServiceCollection().AddLogging(x => x.AddConsole()).BuildServiceProvider();
 
     DiscordClientBuilder builder = DiscordClientBuilder.CreateDefault(botToken, DiscordIntents.None);
-    builder.SetLogLevel(LogLevel.Trace);
+    builder.SetLogLevel(LogLevel.Debug);
+
+    builder.UseCommands((IServiceProvider provider, CommandsExtension commands) =>
+    {
+      commands.AddCommands(TopLevelCommandAttribute.GetTypesWith(typeof(ShadowBotMain).Assembly));
+      commands.AddProcessor(new SlashCommandProcessor());
+      commands.AddProcessor(new MessageCommandProcessor());
+      commands.CommandErrored += CommandErrorHandler.OnCommandErrored;
+    }, new CommandsConfiguration()
+    {
+      RegisterDefaultCommandProcessors = false,
+      UseDefaultCommandErrorHandler = false,
+      DebugGuildId = Settings.DebugGuildId
+    });
 
     // builder.ConfigureEventHandlers(
     // );
@@ -32,22 +45,6 @@ public class ShadowBotMain
     DiscordClient discord = builder.Build();
 
     await discord.ConnectAsync();
-
-    CommandsExtension commands = discord.UseCommands(
-      new CommandsConfiguration()
-      {
-        RegisterDefaultCommandProcessors = false,
-        UseDefaultCommandErrorHandler = false,
-        DebugGuildId = Settings.DebugGuildId
-      }
-    );
-
-    await commands.AddProcessorAsync(new SlashCommandProcessor());
-    await commands.AddProcessorAsync(new MessageCommandProcessor());
-
-    commands.CommandErrored += CommandErrorHandler.OnCommandErrored;
-
-    commands.AddCommands(TopLevelCommandAttribute.GetTypesWith(typeof(ShadowBotMain).Assembly));
 
     try
     {

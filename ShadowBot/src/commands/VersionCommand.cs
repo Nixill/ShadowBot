@@ -58,10 +58,11 @@ public static class VersionCommandClass
     DiscordMessageBuilder message = new DiscordMessageBuilder()
     {
       Content = response
-    }.AddComponents(new DiscordLinkButtonComponent(
-      $"https://github.com/StevenH237/ShadowBot/tree/{hashString}",
-      "Browse repository here"
-    ));
+    }.AddActionRowComponent([
+      new DiscordLinkButtonComponent(
+        $"https://github.com/Nixill/ShadowBot/tree/{hashString}",
+        "Browse repository here")
+    ]);
 
     await ctx.EditResponseAsync(message);
   }

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
+using DSharpPlus.Entities;
 using Nixill.Utils.Extensions;
 using NodaTime;
 using NodaTime.Text;
@@ -12,28 +13,28 @@ public class TimeZoneAutoCompleteProvider : IAutoCompleteProvider
 {
   public static readonly LocalTimePattern TimePtn = LocalTimePattern.CreateWithInvariantCulture("HH:mm");
   public static readonly LocalTimePattern OffsetPtn = LocalTimePattern.CreateWithInvariantCulture("h:mm tt");
-  public static readonly Regex PartialTimeRegex = new(@"^(\d\d?)(?::?$|:(\d$|\d\d))? ?(?:([ap])\.?m?\.?)$?");
+  public static readonly Regex PartialTimeRegex = new(@"^(\d\d?)(?::?$|:(\d$|\d\d))? ?(?:([ap])\.?m?\.?)?$");
 
   static readonly Period Filter = Period.FromSeconds(450);
   static readonly Period HalfDay = Period.FromHours(12);
   static readonly TzdbDateTimeZoneSource TZDB = TzdbDateTimeZoneSource.Default;
 
-  public ValueTask<IReadOnlyDictionary<string, object>> AutoCompleteAsync(AutoCompleteContext ctx)
+  public ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext ctx)
   {
     string input = ctx.UserInput;
-    return ValueTask.FromResult<IReadOnlyDictionary<string, object>>(GetZonesFor(input).DistinctBy(x => x.Name).Take(25).ToDictionary().AsReadOnly());
+    return ValueTask.FromResult<IEnumerable<DiscordAutoCompleteChoice>>(GetZonesFor(input).DistinctBy(x => x.Name).Take(25));
   }
 
-  public IEnumerable<(string Name, object Key)> GetZonesFor(string input)
+  public IEnumerable<DiscordAutoCompleteChoice> GetZonesFor(string input)
   {
     Instant now = SystemClock.Instance.GetCurrentInstant();
 
     if (input == null || input == "")
     {
       var DefaultZone = Settings.TimeZone;
-      yield return ($"Default zone: {DefaultZone.Id} ({TimeInZone(now, DefaultZone)})", DefaultZone.Id);
-      yield return ($"Type your current time to find by time", "UTC");
-      yield return ($"Or start typing a name to search", "UTC");
+      yield return new($"Default zone: {DefaultZone.Id} ({TimeInZone(now, DefaultZone)})", DefaultZone.Id);
+      yield return new($"Type your current time to find by time", "UTC");
+      yield return new($"Or start typing a name to search", "UTC");
       yield break;
     }
 
@@ -54,24 +55,24 @@ public class TimeZoneAutoCompleteProvider : IAutoCompleteProvider
       {
         int minute = int.Parse(mtc.Groups[2].Value);
         foreach (var v in ZonesForTime(hour, minute, now))
-          yield return ($"{v.Zone.Id} ({TimePtn.Format(v.Time)})", v.Zone.Id);
+          yield return new($"{v.Zone.Id} ({TimePtn.Format(v.Time)})", v.Zone.Id);
 
         if (!mtc.Groups[3].Success)
         {
           foreach (var v in ZonesForTime((hour + 12) % 24, minute, now))
-            yield return ($"{v.Zone.Id} ({OffsetPtn.Format(v.Time)})", v.Zone.Id);
+            yield return new($"{v.Zone.Id} ({OffsetPtn.Format(v.Time)})", v.Zone.Id);
         }
       }
 
       else
       {
         foreach (var v in ZonesForTime(hour, now))
-          yield return ($"{v.Zone.Id} ({TimePtn.Format(v.Time)})", v.Zone.Id);
+          yield return new($"{v.Zone.Id} ({TimePtn.Format(v.Time)})", v.Zone.Id);
 
         if (!mtc.Groups[3].Success)
         {
           foreach (var v in ZonesForTime((hour + 12) % 24, now))
-            yield return ($"{v.Zone.Id} ({OffsetPtn.Format(v.Time)})", v.Zone.Id);
+            yield return new($"{v.Zone.Id} ({OffsetPtn.Format(v.Time)})", v.Zone.Id);
         }
       }
     }
@@ -79,7 +80,7 @@ public class TimeZoneAutoCompleteProvider : IAutoCompleteProvider
     else
     {
       foreach (var v in ZonesForQuery(input, now))
-        yield return ($"{v.Zone.Id} ({TimePtn.Format(v.Time)})", v.Zone.Id);
+        yield return new($"{v.Zone.Id} ({TimePtn.Format(v.Time)})", v.Zone.Id);
     }
   }
 
@@ -105,7 +106,7 @@ public class TimeZoneAutoCompleteProvider : IAutoCompleteProvider
     LocalTime maximum = new LocalTime((hour + 1) % 24, 10);
 
     if (minimum > maximum) return NonAliasZoneTimes(now)
-      .Where(v => v.Time < maximum || v.Time > maximum);
+      .Where(v => v.Time < maximum || v.Time > minimum);
     else return NonAliasZoneTimes(now)
       .Where(v => v.Time < maximum && v.Time > minimum);
   }
@@ -116,7 +117,7 @@ public class TimeZoneAutoCompleteProvider : IAutoCompleteProvider
     LocalTime maximum = new LocalTime(hour, minute) + Filter;
 
     if (minimum > maximum) return NonAliasZoneTimes(now)
-      .Where(v => v.Time < maximum || v.Time > maximum);
+      .Where(v => v.Time < maximum || v.Time > minimum);
     else return NonAliasZoneTimes(now)
       .Where(v => v.Time < maximum && v.Time > minimum);
   }

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
+using DSharpPlus.Entities;
 using Nixill.Utils;
 using Nixill.Utils.Extensions;
 using NodaTime;
@@ -48,7 +49,7 @@ public partial class DateAutoCompleteProvider : IAutoCompleteProvider
   static Period Day => Period.FromDays(1);
   static Period Days(int i) => Period.FromDays(i);
 
-  public async ValueTask<IReadOnlyDictionary<string, object>> AutoCompleteAsync(AutoCompleteContext ctx)
+  public async ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext ctx)
   {
     await Task.Delay(0);
     IEnumerable<(string, LocalDate, int)> dates = GetDates(ctx);
@@ -74,8 +75,7 @@ public partial class DateAutoCompleteProvider : IAutoCompleteProvider
         else return -(l.CompareTo(r));
       }))
       .Take(25)
-      .Select(p => ((string, object))(p.Item1, Iso(p.Item2)))
-      .ToDictionary();
+      .Select(p => new DiscordAutoCompleteChoice(p.Item1, Iso(p.Item2)));
   }
 
   static string Iso(LocalDate date) => LocalDatePattern.Iso.Format(date);
