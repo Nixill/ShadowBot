@@ -243,7 +243,7 @@ public static class TimeCommand
 
     else if (format == null && isCodeCommand)
     {
-      if (date != null) formatChars = [('d', "Short date")];
+      if (date != null) formatChars = [('f', "Short date/time")];
       else if (unix % 60 != 0) formatChars = [('T', "Long time")];
       else formatChars = [('t', "Short time")];
     }
